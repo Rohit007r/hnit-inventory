@@ -50,7 +50,7 @@
 
 <script>
 const PASSWORD = "HNIT@@##1231";
-const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-bot/main/data.csv"; // Replace with your actual CSV URL
+const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-inventory/main/inventory.csv";
 let data = [], headers = [];
 
 function checkPassword() {
@@ -98,74 +98,4 @@ function fillDropdown(id, key) {
   const values = [...new Set(data.map(d => d[key]))].filter(Boolean);
   const dropdown = document.getElementById(id);
   dropdown.innerHTML = `<option value="">-- ${key} --</option>` +
-    values.map(v => `<option value="${v}">${v}</option>`).join('');
-  dropdown.onchange = renderTable;
-}
-
-function clearFilters() {
-  document.getElementById("locationFilter").value = "";
-  document.getElementById("workstationFilter").value = "";
-  document.getElementById("stateFilter").value = "";
-  renderTable();
-}
-
-function renderTable() {
-  const loc = document.getElementById("locationFilter").value;
-  const ws = document.getElementById("workstationFilter").value;
-  const state = document.getElementById("stateFilter").value;
-
-  const filtered = data.filter(row =>
-    (!loc || row["LOCATION"] === loc) &&
-    (!ws || row["WORKSTATION"] === ws) &&
-    (!state || row["STATE"] === state)
-  );
-
-  const table = document.getElementById("inventoryTable");
-  table.innerHTML = "";
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  headers.forEach(h => {
-    const th = document.createElement("th"); th.innerText = h; headerRow.appendChild(th);
-  });
-  headerRow.innerHTML += "<th>Actions</th>";
-  thead.appendChild(headerRow); table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  filtered.forEach((row, i) => {
-    const tr = document.createElement("tr");
-    headers.forEach(h => {
-      const td = document.createElement("td");
-      td.innerHTML = `<input value="${row[h] || ""}" onchange="data[${i}]['${h}'] = this.value">`;
-      tr.appendChild(td);
-    });
-    const del = document.createElement("td");
-    del.innerHTML = `<button onclick="deleteRow(${i})">❌</button>`;
-    tr.appendChild(del);
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-}
-
-function addRow() {
-  const newRow = {};
-  headers.forEach(h => newRow[h] = "");
-  data.push(newRow);
-  renderTable();
-}
-
-function deleteRow(i) {
-  if (confirm("Delete this row?")) {
-    data.splice(i, 1);
-    renderSummary();
-    renderTable();
-  }
-}
-
-function exportCSV() {
-  const csv = Papa.unparse(data);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  saveAs(blob, "updated_inventory.csv");
-}
-</script>
-</body>
-</html>
+    values.map(v => `<option value
