@@ -19,6 +19,8 @@
     #loginScreen { text-align: center; margin-top: 100px; }
     #mainContent { display: none; }
     select { padding: 5px; margin: 5px; }
+    .readonly input { background: #eee; pointer-events: none; }
+    .readonly button { display: none; }
   </style>
 </head>
 <body>
@@ -40,7 +42,7 @@
     <button onclick="clearFilters()">Clear Filters</button>
   </div>
 
-  <div style="text-align:center; margin: 10px 0;">
+  <div style="text-align:center; margin: 10px 0;" id="editControls">
     <button onclick="addRow()" class="btn">➕ Add Item</button>
     <button onclick="exportCSV()" class="btn">💾 Export CSV</button>
   </div>
@@ -49,16 +51,31 @@
 </div>
 
 <script>
-const PASSWORD = "HNIT@@##1231";
 const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-inventory/main/inventory.csv";
+const EDIT_PASSWORD = "HNIT@@##1231";
+const VIEW_PASSWORD = "Er&0de@12$";
+
 let data = [], headers = [];
+let readOnly = false;
 
 function checkPassword() {
-  if (document.getElementById("password").value === PASSWORD) {
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("mainContent").style.display = "block";
-    loadCSV();
-  } else alert("❌ Incorrect Password");
+  const pwd = document.getElementById("password").value;
+  if (pwd === EDIT_PASSWORD) {
+    readOnly = false;
+    proceed();
+  } else if (pwd === VIEW_PASSWORD) {
+    readOnly = true;
+    proceed();
+  } else {
+    alert("❌ Incorrect Password");
+  }
+}
+
+function proceed() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("mainContent").style.display = "block";
+  if (readOnly) document.getElementById("editControls").style.display = "none";
+  loadCSV();
 }
 
 function loadCSV() {
@@ -76,15 +93,28 @@ function loadCSV() {
 }
 
 function renderSummary() {
-  const total = data.length;
-  const byType = new Set(data.map(d => d["WORKSTATION"])).size;
-  const byLoc = new Set(data.map(d => d["LOCATION"])).size;
-  const byStatus = new Set(data.map(d => d["EMP STATUS"])).size;
+  const loc = document.getElementById("locationFilter").value;
+  const ws = document.getElementById("workstationFilter").value;
+  const state = document.getElementById("stateFilter").value;
+
+  const filtered = data.filter(row =>
+    (!loc || row["LOCATION"] === loc) &&
+    (!ws || row["WORKSTATION"] === ws) &&
+    (!state || row["STATE"] === state)
+  );
+
+  const total = filtered.length;
+  const byType = new Set(filtered.map(d => d["WORKSTATION"])).size;
+  const byLoc = new Set(filtered.map(d => d["LOCATION"])).size;
+  const byStatus = new Set(filtered.map(d => d["EMP STATUS"])).size;
+  const byState = new Set(filtered.map(d => d["STATE"])).size;
+
   document.getElementById("summaryCards").innerHTML = `
     <div class="card"><h3>Total Items</h3><p>${total}</p></div>
     <div class="card"><h3>Workstation Types</h3><p>${byType}</p></div>
     <div class="card"><h3>Locations</h3><p>${byLoc}</p></div>
     <div class="card"><h3>Employee Statuses</h3><p>${byStatus}</p></div>
+    <div class="card"><h3>States</h3><p>${byState}</p></div>
   `;
 }
 
@@ -99,13 +129,17 @@ function fillDropdown(id, key) {
   const dropdown = document.getElementById(id);
   dropdown.innerHTML = `<option value="">-- ${key} --</option>` +
     values.map(v => `<option value="${v}">${v}</option>`).join('');
-  dropdown.onchange = renderTable;
+  dropdown.onchange = () => {
+    renderSummary();
+    renderTable();
+  };
 }
 
 function clearFilters() {
   document.getElementById("locationFilter").value = "";
   document.getElementById("workstationFilter").value = "";
   document.getElementById("stateFilter").value = "";
+  renderSummary();
   renderTable();
 }
 
@@ -127,7 +161,7 @@ function renderTable() {
   headers.forEach(h => {
     const th = document.createElement("th"); th.innerText = h; headerRow.appendChild(th);
   });
-  headerRow.innerHTML += "<th>Actions</th>";
+  if (!readOnly) headerRow.innerHTML += "<th>Actions</th>";
   thead.appendChild(headerRow); table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
@@ -135,12 +169,16 @@ function renderTable() {
     const tr = document.createElement("tr");
     headers.forEach(h => {
       const td = document.createElement("td");
-      td.innerHTML = `<input value="${row[h] || ""}" onchange="data[${i}]['${h}'] = this.value">`;
+      td.innerHTML = readOnly
+        ? `<input value="${row[h] || ""}" readonly>`
+        : `<input value="${row[h] || ""}" onchange="data[${i}]['${h}'] = this.value">`;
       tr.appendChild(td);
     });
-    const del = document.createElement("td");
-    del.innerHTML = `<button onclick="deleteRow(${i})">❌</button>`;
-    tr.appendChild(del);
+    if (!readOnly) {
+      const del = document.createElement("td");
+      del.innerHTML = `<button onclick="deleteRow(${i})">❌</button>`;
+      tr.appendChild(del);
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -150,6 +188,7 @@ function addRow() {
   const newRow = {};
   headers.forEach(h => newRow[h] = "");
   data.push(newRow);
+  renderSummary();
   renderTable();
 }
 
