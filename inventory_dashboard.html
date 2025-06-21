@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HNIT Inventory Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    h2 { text-align: center; }
+    .summary { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; width: 180px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+    th, td { padding: 8px 12px; border: 1px solid #ccc; text-align: left; }
+    th { background: #333; color: white; }
+    td input { width: 100%; border: none; background: transparent; }
+    .btn { padding: 6px 12px; margin: 4px; cursor: pointer; }
+    #loginScreen { text-align: center; margin-top: 100px; }
+    #mainContent { display: none; }
+    select { padding: 5px; margin: 5px; }
+  </style>
+</head>
+<body>
+<div id="loginScreen">
+  <h2>🔐 Enter Password to Access Inventory</h2>
+  <input type="password" id="password" placeholder="Enter Password" />
+  <button onclick="checkPassword()">Login</button>
+</div>
+
+<div id="mainContent">
+  <h2>📦 HNIT Inventory Dashboard</h2>
+  <div class="summary" id="summaryCards"></div>
+
+  <div style="text-align:center">
+    Filter:
+    <select id="locationFilter"></select>
+    <select id="workstationFilter"></select>
+    <select id="stateFilter"></select>
+    <button onclick="clearFilters()">Clear Filters</button>
+  </div>
+
+  <div style="text-align:center; margin: 10px 0;">
+    <button onclick="addRow()" class="btn">➕ Add Item</button>
+    <button onclick="exportCSV()" class="btn">💾 Export CSV</button>
+  </div>
+
+  <table id="inventoryTable"></table>
+</div>
+
+<script>
+const PASSWORD = "HNIT@@##1231";
+const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-bot/main/data.csv"; // Replace with your actual CSV URL
+let data = [], headers = [];
+
+function checkPassword() {
+  if (document.getElementById("password").value === PASSWORD) {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("mainContent").style.display = "block";
+    loadCSV();
+  } else alert("❌ Incorrect Password");
+}
+
+function loadCSV() {
+  Papa.parse(DATA_URL, {
+    download: true,
+    header: true,
+    complete: (results) => {
+      data = results.data.filter(r => Object.values(r).some(v => v));
+      headers = Object.keys(data[0]);
+      renderSummary();
+      fillFilters();
+      renderTable();
+    }
+  });
+}
+
+function renderSummary() {
+  const total = data.length;
+  const byType = new Set(data.map(d => d["WORKSTATION"])).size;
+  const byLoc = new Set(data.map(d => d["LOCATION"])).size;
+  const byStatus = new Set(data.map(d => d["EMP STATUS"])).size;
+  document.getElementById("summaryCards").innerHTML = `
+    <div class="card"><h3>Total Items</h3><p>${total}</p></div>
+    <div class="card"><h3>Workstation Types</h3><p>${byType}</p></div>
+    <div class="card"><h3>Locations</h3><p>${byLoc}</p></div>
+    <div class="card"><h3>Employee Statuses</h3><p>${byStatus}</p></div>
+  `;
+}
+
+function fillFilters() {
+  fillDropdown("locationFilter", "LOCATION");
+  fillDropdown("workstationFilter", "WORKSTATION");
+  fillDropdown("stateFilter", "STATE");
+}
+
+function fillDropdown(id, key) {
+  const values = [...new Set(data.map(d => d[key]))].filter(Boolean);
+  const dropdown = document.getElementById(id);
+  dropdown.innerHTML = `<option value="">-- ${key} --</option>` +
+    values.map(v => `<option value="${v}">${v}</option>`).join('');
+  dropdown.onchange = renderTable;
+}
+
+function clearFilters() {
+  document.getElementById("locationFilter").value = "";
+  document.getElementById("workstationFilter").value = "";
+  document.getElementById("stateFilter").value = "";
+  renderTable();
+}
+
+function renderTable() {
+  const loc = document.getElementById("locationFilter").value;
+  const ws = document.getElementById("workstationFilter").value;
+  const state = document.getElementById("stateFilter").value;
+
+  const filtered = data.filter(row =>
+    (!loc || row["LOCATION"] === loc) &&
+    (!ws || row["WORKSTATION"] === ws) &&
+    (!state || row["STATE"] === state)
+  );
+
+  const table = document.getElementById("inventoryTable");
+  table.innerHTML = "";
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+  headers.forEach(h => {
+    const th = document.createElement("th"); th.innerText = h; headerRow.appendChild(th);
+  });
+  headerRow.innerHTML += "<th>Actions</th>";
+  thead.appendChild(headerRow); table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  filtered.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    headers.forEach(h => {
+      const td = document.createElement("td");
+      td.innerHTML = `<input value="${row[h] || ""}" onchange="data[${i}]['${h}'] = this.value">`;
+      tr.appendChild(td);
+    });
+    const del = document.createElement("td");
+    del.innerHTML = `<button onclick="deleteRow(${i})">❌</button>`;
+    tr.appendChild(del);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+}
+
+function addRow() {
+  const newRow = {};
+  headers.forEach(h => newRow[h] = "");
+  data.push(newRow);
+  renderTable();
+}
+
+function deleteRow(i) {
+  if (confirm("Delete this row?")) {
+    data.splice(i, 1);
+    renderSummary();
+    renderTable();
+  }
+}
+
+function exportCSV() {
+  const csv = Papa.unparse(data);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  saveAs(blob, "updated_inventory.csv");
+}
+</script>
+</body>
+</html>
