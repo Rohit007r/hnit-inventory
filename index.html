@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HNIT Inventory Dashboard</title>
+  <title>HNIT PAN INDIA INVENTORY DASHBOARD</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
@@ -31,7 +31,7 @@
 </div>
 
 <div id="mainContent">
-  <h2>📦 HNIT Inventory Dashboard</h2>
+  <h2>📦 HNIT PAN INDIA INVENTORY DASHBOARD</h2>
   <div class="summary" id="summaryCards"></div>
 
   <div style="text-align:center">
@@ -104,17 +104,22 @@ function renderSummary() {
   );
 
   const total = filtered.length;
-  const byType = new Set(filtered.map(d => d["WORKSTATION"])).size;
-  const byLoc = new Set(filtered.map(d => d["LOCATION"])).size;
-  const byStatus = new Set(filtered.map(d => d["EMP STATUS"])).size;
-  const byState = new Set(filtered.map(d => d["STATE"])).size;
+
+  const stateCounts = {};
+  filtered.forEach(row => {
+    const st = row["STATE"];
+    if (st) {
+      stateCounts[st] = (stateCounts[st] || 0) + 1;
+    }
+  });
+
+  const stateCards = Object.entries(stateCounts).map(([state, count]) => `
+    <div class="card"><h3>${state}</h3><p>${count} items</p></div>
+  `).join('');
 
   document.getElementById("summaryCards").innerHTML = `
     <div class="card"><h3>Total Items</h3><p>${total}</p></div>
-    <div class="card"><h3>Workstation Types</h3><p>${byType}</p></div>
-    <div class="card"><h3>Locations</h3><p>${byLoc}</p></div>
-    <div class="card"><h3>Employee Statuses</h3><p>${byStatus}</p></div>
-    <div class="card"><h3>States</h3><p>${byState}</p></div>
+    ${stateCards}
   `;
 }
 
