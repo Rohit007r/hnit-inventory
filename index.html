@@ -17,21 +17,14 @@
     .summary { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
     .card { background: linear-gradient(to right, #74b9ff, #0984e3); color: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center; width: 220px; }
     .filters, .controls { text-align: center; margin: 20px 0; }
-    .filters select, .controls button { padding: 8px 12px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
+    .filters select, .filters input, .controls button { padding: 8px 12px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
     table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
     th, td { padding: 10px 12px; border: 1px solid #ddd; text-align: left; }
-    th { background: #0a3d62; color: white; }
+    th { background: #0a3d62; color: white; cursor: pointer; }
     td input { width: 100%; border: none; background: transparent; }
-    .readonly input { background: #eee; pointer-events: none; }
-    .readonly button { display: none; }
     canvas { max-width: 600px; margin: 30px auto; display: block; }
-    .modal {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.6); justify-content: center; align-items: center;
-    }
-    .modal-content {
-      background: #fff; padding: 20px; border-radius: 10px; max-width: 500px; width: 100%;
-    }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); justify-content: center; align-items: center; }
+    .modal-content { background: #fff; padding: 20px; border-radius: 10px; max-width: 500px; width: 100%; }
   </style>
 </head>
 <body>
@@ -56,11 +49,13 @@
         Filter:
         <select id="locationFilter"></select>
         <select id="stateFilter"></select>
+        <input type="text" id="searchInput" placeholder="Search any text" />
         <button onclick="clearFilters()">Clear</button>
       </div>
 
       <div class="summary" id="summaryCards"></div>
       <canvas id="pieChart"></canvas>
+      <canvas id="barChart"></canvas>
 
       <div class="controls" id="editControls">
         <button onclick="addRow()">➕ Add Item</button>
@@ -82,7 +77,7 @@ const VIEW_PASSWORD = "Er&0de@12$";
 
 let data = [], headers = [];
 let readOnly = false;
-let chart;
+let chart, barChart;
 
 function checkPassword() {
   const pwd = document.getElementById("password").value;
@@ -115,17 +110,22 @@ function loadCSV() {
 function renderSummary() {
   const loc = document.getElementById("locationFilter").value;
   const state = document.getElementById("stateFilter").value;
+  const search = document.getElementById("searchInput").value.toLowerCase();
 
   const filtered = data.filter(row =>
     (!loc || row["LOCATION"] === loc) &&
-    (!state || row["STATE"] === state)
+    (!state || row["STATE"] === state) &&
+    Object.values(row).some(val => val?.toLowerCase().includes(search))
   );
 
   const total = filtered.length;
   const stateCounts = {};
+  const locationCounts = {};
   filtered.forEach(row => {
     const st = row["STATE"];
+    const loc = row["LOCATION"];
     if (st) stateCounts[st] = (stateCounts[st] || 0) + 1;
+    if (loc) locationCounts[loc] = (locationCounts[loc] || 0) + 1;
   });
 
   const stateCards = Object.entries(stateCounts).map(([state, count]) => `
@@ -138,6 +138,7 @@ function renderSummary() {
   `;
 
   renderPieChart(stateCounts);
+  renderBarChart(locationCounts);
 }
 
 function renderPieChart(dataObj) {
@@ -156,9 +157,30 @@ function renderPieChart(dataObj) {
   });
 }
 
+function renderBarChart(dataObj) {
+  const ctx = document.getElementById('barChart').getContext('2d');
+  if (barChart) barChart.destroy();
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(dataObj),
+      datasets: [{
+        label: 'Location-wise Inventory',
+        data: Object.values(dataObj),
+        backgroundColor: '#0984e3'
+      }]
+    },
+    options: { responsive: true, indexAxis: 'y' }
+  });
+}
+
 function fillFilters() {
   fillDropdown("locationFilter", "LOCATION");
   fillDropdown("stateFilter", "STATE");
+  document.getElementById("searchInput").oninput = () => {
+    renderSummary();
+    renderTable();
+  };
 }
 
 function fillDropdown(id, key) {
@@ -172,6 +194,7 @@ function fillDropdown(id, key) {
 function clearFilters() {
   document.getElementById("locationFilter").value = "";
   document.getElementById("stateFilter").value = "";
+  document.getElementById("searchInput").value = "";
   renderSummary();
   renderTable();
 }
@@ -179,10 +202,12 @@ function clearFilters() {
 function renderTable() {
   const loc = document.getElementById("locationFilter").value;
   const state = document.getElementById("stateFilter").value;
+  const search = document.getElementById("searchInput").value.toLowerCase();
 
   const filtered = data.filter(row =>
     (!loc || row["LOCATION"] === loc) &&
-    (!state || row["STATE"] === state)
+    (!state || row["STATE"] === state) &&
+    Object.values(row).some(val => val?.toLowerCase().includes(search))
   );
 
   const table = document.getElementById("inventoryTable");
