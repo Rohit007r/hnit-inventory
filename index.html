@@ -6,49 +6,74 @@
   <title>HNIT PAN INDIA INVENTORY DASHBOARD</title>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-    h2 { text-align: center; }
-    .summary { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
-    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; width: 180px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-    th, td { padding: 8px 12px; border: 1px solid #ccc; text-align: left; }
-    th { background: #333; color: white; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f9fafe; margin: 0; padding: 0; }
+    header { background: #0a3d62; color: #fff; padding: 20px; text-align: center; }
+    nav { background: #1e3799; padding: 10px; display: flex; justify-content: center; gap: 15px; }
+    nav button { background: #fff; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    .container { padding: 20px; max-width: 1400px; margin: auto; }
+    .summary { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+    .card { background: linear-gradient(to right, #74b9ff, #0984e3); color: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); text-align: center; width: 220px; }
+    .filters, .controls { text-align: center; margin: 20px 0; }
+    .filters select, .controls button { padding: 8px 12px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
+    table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
+    th, td { padding: 10px 12px; border: 1px solid #ddd; text-align: left; }
+    th { background: #0a3d62; color: white; }
     td input { width: 100%; border: none; background: transparent; }
-    .btn { padding: 6px 12px; margin: 4px; cursor: pointer; }
-    #loginScreen { text-align: center; margin-top: 100px; }
-    #mainContent { display: none; }
-    select { padding: 5px; margin: 5px; }
     .readonly input { background: #eee; pointer-events: none; }
     .readonly button { display: none; }
+    canvas { max-width: 600px; margin: 30px auto; display: block; }
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6); justify-content: center; align-items: center;
+    }
+    .modal-content {
+      background: #fff; padding: 20px; border-radius: 10px; max-width: 500px; width: 100%;
+    }
   </style>
 </head>
 <body>
-<div id="loginScreen">
-  <h2>🔐 Enter Password to Access Inventory</h2>
-  <input type="password" id="password" placeholder="Enter Password" />
-  <button onclick="checkPassword()">Login</button>
-</div>
+  <header>
+    <h1>📦 HNIT PAN INDIA INVENTORY DASHBOARD</h1>
+  </header>
+  <nav>
+    <button onclick="location.reload()">Dashboard</button>
+    <button onclick="alert('Feature coming soon')">Asset Details</button>
+    <button onclick="alert('Feature coming soon')">Reports</button>
+  </nav>
 
-<div id="mainContent">
-  <h2>📦 HNIT PAN INDIA INVENTORY DASHBOARD</h2>
-  <div class="summary" id="summaryCards"></div>
+  <div class="container">
+    <div id="loginScreen" style="text-align:center; margin-top:50px">
+      <h2>🔐 Enter Password to Access</h2>
+      <input type="password" id="password" placeholder="Enter Password" />
+      <button onclick="checkPassword()">Login</button>
+    </div>
 
-  <div style="text-align:center">
-    Filter:
-    <select id="locationFilter"></select>
-    <select id="workstationFilter"></select>
-    <select id="stateFilter"></select>
-    <button onclick="clearFilters()">Clear Filters</button>
+    <div id="mainContent" style="display:none">
+      <div class="filters">
+        Filter:
+        <select id="locationFilter"></select>
+        <select id="stateFilter"></select>
+        <button onclick="clearFilters()">Clear</button>
+      </div>
+
+      <div class="summary" id="summaryCards"></div>
+      <canvas id="pieChart"></canvas>
+
+      <div class="controls" id="editControls">
+        <button onclick="addRow()">➕ Add Item</button>
+        <button onclick="exportCSV()">💾 Export CSV</button>
+      </div>
+
+      <table id="inventoryTable"></table>
+    </div>
   </div>
 
-  <div style="text-align:center; margin: 10px 0;" id="editControls">
-    <button onclick="addRow()" class="btn">➕ Add Item</button>
-    <button onclick="exportCSV()" class="btn">💾 Export CSV</button>
+  <div class="modal" id="editModal">
+    <div class="modal-content" id="modalContent"></div>
   </div>
-
-  <table id="inventoryTable"></table>
-</div>
 
 <script>
 const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-inventory/main/inventory.csv";
@@ -57,18 +82,13 @@ const VIEW_PASSWORD = "Er&0de@12$";
 
 let data = [], headers = [];
 let readOnly = false;
+let chart;
 
 function checkPassword() {
   const pwd = document.getElementById("password").value;
-  if (pwd === EDIT_PASSWORD) {
-    readOnly = false;
-    proceed();
-  } else if (pwd === VIEW_PASSWORD) {
-    readOnly = true;
-    proceed();
-  } else {
-    alert("❌ Incorrect Password");
-  }
+  if (pwd === EDIT_PASSWORD) { readOnly = false; proceed(); }
+  else if (pwd === VIEW_PASSWORD) { readOnly = true; proceed(); }
+  else alert("❌ Incorrect Password");
 }
 
 function proceed() {
@@ -94,23 +114,18 @@ function loadCSV() {
 
 function renderSummary() {
   const loc = document.getElementById("locationFilter").value;
-  const ws = document.getElementById("workstationFilter").value;
   const state = document.getElementById("stateFilter").value;
 
   const filtered = data.filter(row =>
     (!loc || row["LOCATION"] === loc) &&
-    (!ws || row["WORKSTATION"] === ws) &&
     (!state || row["STATE"] === state)
   );
 
   const total = filtered.length;
-
   const stateCounts = {};
   filtered.forEach(row => {
     const st = row["STATE"];
-    if (st) {
-      stateCounts[st] = (stateCounts[st] || 0) + 1;
-    }
+    if (st) stateCounts[st] = (stateCounts[st] || 0) + 1;
   });
 
   const stateCards = Object.entries(stateCounts).map(([state, count]) => `
@@ -121,11 +136,28 @@ function renderSummary() {
     <div class="card"><h3>Total Items</h3><p>${total}</p></div>
     ${stateCards}
   `;
+
+  renderPieChart(stateCounts);
+}
+
+function renderPieChart(dataObj) {
+  const ctx = document.getElementById('pieChart').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: Object.keys(dataObj),
+      datasets: [{
+        label: 'State Distribution',
+        data: Object.values(dataObj),
+        backgroundColor: ['#e17055', '#00cec9', '#ffeaa7', '#6c5ce7', '#fab1a0', '#81ecec']
+      }]
+    }
+  });
 }
 
 function fillFilters() {
   fillDropdown("locationFilter", "LOCATION");
-  fillDropdown("workstationFilter", "WORKSTATION");
   fillDropdown("stateFilter", "STATE");
 }
 
@@ -134,15 +166,11 @@ function fillDropdown(id, key) {
   const dropdown = document.getElementById(id);
   dropdown.innerHTML = `<option value="">-- ${key} --</option>` +
     values.map(v => `<option value="${v}">${v}</option>`).join('');
-  dropdown.onchange = () => {
-    renderSummary();
-    renderTable();
-  };
+  dropdown.onchange = () => { renderSummary(); renderTable(); };
 }
 
 function clearFilters() {
   document.getElementById("locationFilter").value = "";
-  document.getElementById("workstationFilter").value = "";
   document.getElementById("stateFilter").value = "";
   renderSummary();
   renderTable();
@@ -150,12 +178,10 @@ function clearFilters() {
 
 function renderTable() {
   const loc = document.getElementById("locationFilter").value;
-  const ws = document.getElementById("workstationFilter").value;
   const state = document.getElementById("stateFilter").value;
 
   const filtered = data.filter(row =>
     (!loc || row["LOCATION"] === loc) &&
-    (!ws || row["WORKSTATION"] === ws) &&
     (!state || row["STATE"] === state)
   );
 
@@ -176,7 +202,7 @@ function renderTable() {
       const td = document.createElement("td");
       td.innerHTML = readOnly
         ? `<input value="${row[h] || ""}" readonly>`
-        : `<input value="${row[h] || ""}" onchange="data[${i}]['${h}'] = this.value">`;
+        : `<input value="${row[h] || ""}" onclick="openModal(${i})">`;
       tr.appendChild(td);
     });
     if (!readOnly) {
@@ -188,6 +214,21 @@ function renderTable() {
   });
   table.appendChild(tbody);
 }
+
+function openModal(index) {
+  const modal = document.getElementById("editModal");
+  const modalContent = document.getElementById("modalContent");
+  const row = data[index];
+  modalContent.innerHTML = `<h3>Edit Row</h3>` +
+    headers.map(h => `<label>${h}: <input value="${row[h]}" onchange="data[${index}]['${h}'] = this.value"></label><br><br>`).join('') +
+    `<button onclick="document.getElementById('editModal').style.display='none'; renderTable();">Close</button>`;
+  modal.style.display = 'flex';
+}
+
+window.onclick = function(event) {
+  const modal = document.getElementById("editModal");
+  if (event.target == modal) modal.style.display = "none";
+};
 
 function addRow() {
   const newRow = {};
