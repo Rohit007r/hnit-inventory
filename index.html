@@ -132,10 +132,16 @@
   </div>
 
 <script>
-const DATA_URL = "https://raw.githubusercontent.com/Rohit007r/hnit-inventory/main/inventory.csv";
+// ✅ Google Sheet Details
+const SHEET_ID = "10ZVQMd-RSeCI4m4vrXcVkmK0PmSlpX1uuruzbwwogjc";
+const SHEET_NAME = "inventory";
+const DATA_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
+
+// 🔐 Passwords
 const EDIT_PASSWORD = "HNIT@@##1231";
 const VIEW_PASSWORD = "Er&0de@12$";
 
+// 🧠 Core Logic
 let data = [], headers = [];
 let readOnly = false;
 let chart, barChart;
